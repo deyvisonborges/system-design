@@ -139,3 +139,124 @@ Erros comuns:
 1. Como o bulkhead difere de um simples rate limiting?
 2. Em que parte do sistema você aplicaria isolamento de recursos primeiro?
 3. Quais sinais indicam que seu sistema precisa de bulkhead?
+
+___
+
+## 🛒 O Cenário Prático
+
+Imagine uma API de E-commerce com duas integrações externas:
+
+1. Serviço de Pagamento (Crítico e rápido)
+2. Serviço de Inventário (Lento e instável)
+
+Se o Serviço de Inventário ficar lento, muitas requisições vão se acumular esperando a resposta dele. Sem o Bulkhead, essas requisições lentas vão consumir todas as threads do seu servidor web. O resultado? Quando um cliente tentar fazer um Pagamento, a sua API não terá threads disponíveis para processar a requisição, e o sistema inteiro "cai".
+
+O Bulkhead resolve isso limitando quantas requisições simultâneas podem ir para o Inventário.
+
+### Exemplo com Java + Spring
+
+```java
+resilience4j.bulkhead:
+  instances:
+    servicoInventario:
+      maxConcurrentCalls: 5 # Máximo de 5 chamadas simultâneas para o inventário
+      maxWaitDuration: 0 # Se já tiver 5 rodando, as próximas falham imediatamente sem esperar
+
+
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Service
+public class InventarioService {
+
+    private static final Logger log = LoggerFactory.getLogger(InventarioService.class);
+
+    // O "name" deve bater exatamente com o que está no application.yml
+    // O "fallbackMethod" é acionado se o Bulkhead estiver cheio
+    @Bulkhead(name = "servicoInventario", fallbackMethod = "inventarioFallback")
+    public String consultarEstoque(String produtoId) {
+        log.info("Consultando estoque no sistema legado para o produto: {}", produtoId);
+        
+        // Simulando uma chamada externa que demora 10 segundos
+        try {
+            Thread.sleep(10000); 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        return "Estoque disponível para o produto " + produtoId;
+    }
+
+    // Método de fallback: deve ter a mesma assinatura e receber a Exception no final
+    public String inventarioFallback(String produtoId, Exception e) {
+        log.warn("Bulkhead cheio! Protegendo a aplicação. Rejeitando requisição para: {}", produtoId);
+        return "Não foi possível verificar o estoque no momento (Serviço sobrecarregado).";
+    }
+}
+```
+
+___
+
+## Outro caso de uso
+
+Existe um endpoint:
+
+```http
+GET /loan/{id}
+```
+
+Para responder essa requisição ele consulta:
+
+- Banco de dados
+- Serviço de Score
+- Serviço de Fraude
+- Serviço de Notificações (para registrar acesso)
+
+```md
+        Loan API
+            |
+----------------------------
+|     |        |          |
+DB   Score   Fraude   Notificações
+```
+
+Com o bulkhead, vamos ter pool separados
+
+```md
+Pool Principal
+150 threads
+
+Pool Notificações
+20 threads
+
+Pool Score
+20 threads
+
+Pool Fraude
+10 threads
+```
+
+Visualmente
+
+```md
+        Loan API
+
++--------------------+
+| Pool Principal      |
++--------------------+
+
+    |        |
+    |        |
+Score Pool   Fraud Pool
+
+    |
+Notification Pool
+```
+
+O Bulkhead tem um objetivo simples, mas muito poderoso:
+
+- `Problema`: uma parte lenta ou com falha pode consumir todos os recursos da aplicação.
+- `Solução`: separar recursos (threads, conexões, filas, pods, CPU etc.) por domínio ou dependência.
+- `Benefício`: a falha fica contida naquele "compartimento", permitindo que o restante do sistema continue operando.

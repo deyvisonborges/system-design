@@ -1,20 +1,71 @@
 # Checklist
 
 - Resiliencia
-  - Retry
-  - Backoff
-  - Jitter
-  - Circuit Break
-  - Timeout
+  - Retry [OK]
+  - Backoff [OK]
+  - Jitter [OK]
+  - Circuit Break [OK]
+  - Timeout [OK]
+  - Bulkhead
 - Consistencia
   - ACID
   - BASE
   - Saga Pattern
-  - Outbox Pattern
+  - Teorama CAP
+  - Change Data Capture
+  - Transactional Outbox Pattern
 - Alta Disponibilidade
 - Performance
 - Escalabilidade
+- Confiabilidade
+  - SLA / SLI / SLO
+  - P90
 - Observabilidade e Monitoramento
+  - Logging
+  - Metrics
+  - Alerting
+  - Golden Signal
+  - Red Use Metrics
+  - DORA metrics
+  - RPS Metrics
+  - Limiting
+  - Latency
 - Seguranca e Conformidade
 - Dados e persistencia
 - Integracao e Comunicacao
+  - Principios
+    - Desacoplamento
+    - Escalabilidade
+    - Experiencia do Usuario
+  - Topicos
+    - Integracao assincrona
+      - Websocket
+      - Webhook
+      - Server Sent Events
+      - Event Driven
+        - Buffer Queue
+        - Dead Letter Queue
+        - At Least Once
+        - Exactly Once
+        - Poison Message
+        - Retry Queue
+        - Visibility Timeout
+        - Exponential Retry
+        - RabbitMQ
+        - Kafka
+          - Offset
+          - Topics
+        - SQS
+        - SNS
+- API Gateway
+- Anti-Corruption Layer
+- REST, GraphQL, gRPC, JSON-RPC
+- CQRS
+- Idempotencia
+- Cache
+- Infra
+  - Docker
+  - Kubernetes
+    - Se você tem 10 pods do seu consumer rodando, e cada um aplica "limito a 1500 rps localmente", você na verdade permite 10 × 1500 = 15.000 rps no total — estourando o limite do Bacen 10x.
+    - Por isso o balde precisa ser um só, compartilhado, geralmente implementado no Redis:
+    - Todo pod, antes de chamar o Bacen, executa esse script. Como o Redis processa comandos Lua atomicamente, não tem race condition mesmo com 10 pods disputando ao mesmo tempo — é essa atomicidade que garante que o total nunca passa de 1500, não importa quantas instâncias você tenha.
