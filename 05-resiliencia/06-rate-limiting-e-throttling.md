@@ -494,3 +494,73 @@ Pontos-chave:
 - Por que o sliding window log é mais preciso do que o fixed window?
 - Como você aplicaria rate limiting em um ambiente Kubernetes com múltiplas réplicas?
 - Quais são os riscos de usar apenas a chave IP para limitar requisições?
+
+___
+
+### Throttling (Limitacao de velocidade)
+
+O Throttling controla a velocidade com que o sistema processa as requisições.
+
+Nem sempre significa bloquear.
+
+O sistema pode:
+
+- atrasar a resposta
+- colocar em fila
+- reduzir throughput
+- processar apenas X requisições por segundo
+
+`Ex.:`
+
+```md
+O cliente envia 1000 req/s
+O Servidor suporta 100 req/s
+Em vez de rejeitar tudo, ele pode:
+
+Fila
+1000 chegam
+↓
+processa 100/s
+processa 100/s
+processa 100/s
+...
+
+Ou seja:
+
+Rate Limiting controla quantas requisições podem ser feitas.
+Throttling controla a velocidade com que elas são processadas.
+```
+
+### Rate Limit (Limitacao de taxa)
+
+O Rate Limiting define um limite máximo de requisições em uma janela de tempo.
+
+`Ex.:`
+
+- 100 requisições por minuto
+- 1000 requisições por hora
+- 10 requisições por segundo
+
+`Quando o limite é atingido, normalmente acontece:`:
+
+- HTTP 429 (Too Many Requests)
+- cliente deve esperar
+- pode existir um header `Retry-After`
+
+O objetivo principal é:
+
+- evitar abuso
+- proteger recursos
+- garantir justiça entre clientes
+
+```md
+100 req/min
+
+0s -----------------------------60s
+
+Cliente envia:
+
+100 requisições ✅
+101ª ❌ 429
+102ª ❌ 429
+```

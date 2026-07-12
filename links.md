@@ -1,2 +1,3 @@
 - <https://www.geeksforgeeks.org/system-design/system-design-tutorial/>
 - <https://roadmap.sh/system-design>
+- <https://www.youtube.com/@leozamariola/videos>

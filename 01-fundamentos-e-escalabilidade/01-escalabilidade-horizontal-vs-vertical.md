@@ -1,3 +1,5 @@
+# Definicoes
+
 ## 1. O que é
 
 Escalabilidade vertical e horizontal são duas formas de aumentar a capacidade de um sistema para atender mais demanda. Escalabilidade vertical, também chamada de scale up, consiste em tornar uma única máquina mais poderosa: mais CPU, mais RAM, mais disco, mais bandwidth. Escalabilidade horizontal, também chamada de scale out, consiste em adicionar mais instâncias de serviço, geralmente atrás de um balanceador de carga, para distribuir o tráfego.

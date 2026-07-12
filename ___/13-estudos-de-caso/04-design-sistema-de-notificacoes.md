@@ -1,0 +1,13 @@
+# Design: Sistema de Notificações
+
+> Status: rascunho
+
+## O que é
+
+## Quando usar
+
+## Trade-offs
+
+## Exemplo prático
+
+## Referências
