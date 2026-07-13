@@ -1,5 +1,7 @@
 # Bulkhead
 
+> O bulkhead protege quem faz a chamada, se um worker que processaeventos e faz chamadas, o Worker possui pools independentes, logo o bulkhead deve proteger ele
+
 ## 1. O que é
 
 Bulkhead é um padrão de resiliência que isola recursos para impedir que uma parte do sistema comprometa o restante. O nome vem da compartimentação de um navio: se uma seção afunda, as demais continuam intactas. Na arquitetura de software, isso significa separar pools de threads, conexões, memória, filas ou instâncias para reduzir o impacto de uma falha localizada.
@@ -260,3 +262,61 @@ O Bulkhead tem um objetivo simples, mas muito poderoso:
 - `Problema`: uma parte lenta ou com falha pode consumir todos os recursos da aplicação.
 - `Solução`: separar recursos (threads, conexões, filas, pods, CPU etc.) por domínio ou dependência.
 - `Benefício`: a falha fica contida naquele "compartimento", permitindo que o restante do sistema continue operando.
+
+___
+
+Imagine uma cozinha, onde a mesma é separada por equipes.
+
+Pizza -> 5 cozinheiros
+Hambúrguer -> 5 cozinheiros
+Sobremesa -> 5 cozinheiros
+
+Se a pizza atrasar, o hamburguer continua.
+
+___
+
+Cenario
+
+- uma chamada GET em /products
+  - precisa bater no servico de
+    - produtos
+    - estoque
+    - preco
+    - recomandacoes
+
+```ts
+const [produto, estoque, preco, recomendacoes] =
+    await Promise.all([
+        produtoService.buscar(),
+        estoqueService.buscar(),
+        precoService.buscar(),
+        recomendacaoService.buscar()
+    ]);
+```
+
+**Ate aqui ainda nao eh Bulkhead**, é apenas paralelismo
+
+Imaginamos agora, que o cada servico demore:
+
+- Produto          30ms
+- Estoque          40ms
+- Preço            35ms
+- Recomendação     8 segundos
+
+A requisição inteira demora: 8 segundos devido o problema na recomendacao, porque o promiseall espera todo mundo.
+
+Mas isso ainda nao eh bulkhead.
+
+Agora , se tivermos 4 mil requisicoes por segundos, e considerando que cada requisicao vai chamar os 4 servicos, terremos em torno de 16 mil chamadas externas.
+
+Imaginando o cenario para o bulkhead
+
+Imagine que sua aplicação tenha capacidade para manter `1000 conexões HTTP abertas`
+
+As chamadas para recomendação começam a ocupar tudo.
+Agora chega uma chamada para estoque.
+Não consegue conexão.
+Mesmo o estoque estando saudável.
+`Esse é o problema.`
+
+

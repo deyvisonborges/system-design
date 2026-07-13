@@ -2,7 +2,7 @@
 
 ## 1. O que é
 
-Backpressure é um padrão de controle de fluxo que sinaliza ao produtor para desacelerar quando o consumidor ou o sistema intermediário está sobrecarregado.
+Backpressure é um comportamento de controle de fluxo que sinaliza ao produtor para desacelerar quando o consumidor ou o sistema intermediário está sobrecarregado.
 
 Sinônimos: controle de fluxo, flow control, congestion control.
 
@@ -231,3 +231,44 @@ Erros comuns:
 3. Como window-based flow control funciona em um pipeline de streaming?
 4. Por que é perigoso aplicar backpressure sem visibilidade de recursos?
 5. Como implementar um feedback de desaceleração entre produtor e consumidor?
+
+___
+
+Ex.:
+
+Se o Kafka manda 10000 eps (eventos por segundo), mas meu Worker / Consumer so tem a capacidade (que pode ser definida na configuracao), pra somente 500 eps, posso tomar um erro de OutMemory. A memoria explode.
+
+Configurando no Worker / Consumer, eu limito a quantidade de informacoes pode me enviar, para evitar sobrecargas.
+
+___
+
+Estratégias reais para lidar com backpressure
+
+1. Limitar a entrada (admission control)
+
+Rate limiting no gateway/API (token bucket, sliding window) — rejeita ou atrasa requisições acima da capacidade
+Bulkhead pattern — isola pools de recursos (threads, conexões) por tipo de cliente/operação, pra um consumidor lento não derrubar todo mundo
+
+1. Propagar backpressure de forma explícita
+
+Reactive Streams / Project Reactor (WebFlux) — Flux/Mono com onBackpressureBuffer, onBackpressureDrop, onBackpressureLatest. O subscriber sinaliza quanto consegue processar (request(n)), e o publisher respeita isso
+Em vez de empilhar tudo num buffer infinito, você define explicitamente: bufferizar até X, dropar o mais antigo, dropar o mais novo, ou aplicar sample
+
+1. Filas com limite (bounded queues) + política de rejeição
+
+ThreadPoolExecutor com ArrayBlockingQueue limitado + RejectedExecutionHandler (ex: CallerRunsPolicy pra aplicar backpressure no próprio caller)
+Em Kafka: usar token bucket no consumer pra não estourar downstream (que você já vem estudando)
+
+1. Circuit Breaker + timeout agressivo
+
+Resilience4j: se o downstream tá degradado, abre o circuito rápido em vez de deixar requisições se acumularem esperando
+
+1. Load shedding
+
+Quando a fila/buffer atinge um limite, descarta requisições de baixa prioridade (ex: retries, batch jobs) pra proteger o tráfego crítico (ex: originação de crédito em produção)
+
+1. Escalar o consumidor
+
+Auto-scaling horizontal (K8s HPA baseado em lag de fila/CPU) — ataca a causa raiz quando é volume real, não só pico transitório
+
+> Prática comum: combinar token bucket no consumer Kafka (rate limiting) + Circuit Breaker pro downstream (ex: chamada ao Bacen) + bounded queue com CallerRunsPolicy no processamento assíncrono, e monitorar consumer lag no Dynatrace pra saber quando escalar.
