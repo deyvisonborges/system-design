@@ -271,3 +271,140 @@ Por isso é comum ver recomendações como:
 
 - Spring MVC síncrono → SemaphoreBulkhead
 - WebFlux / programação assíncrona → ThreadPoolBulkhead, quando faz sentido isolar um recurso.
+
+___
+
+# Caso de erro
+
+```java
+@GetMapping("/produto/{id}/completo")
+public ProdutoCompletoDTO buscarCompleto(@PathVariable String id, @PathVariable String userId) {
+    CompletableFuture<Produto> produtoFuture = buscarProduto(id);
+    CompletableFuture<List<Categoria>> categoriasFuture = buscarCategorias(id);
+    CompletableFuture<List<Avaliacao>> avaliacoesFuture = buscarAvaliacoes(id);
+    CompletableFuture<List<Recomendacao>> recomendacoesFuture = buscarRecomendacoes(userId);
+
+    // a thread do Tomcat FICA AQUI, bloqueada, esperando os 4 futures
+    CompletableFuture.allOf(produtoFuture, categoriasFuture, avaliacoesFuture, recomendacoesFuture).join();
+
+    return montarDTO(produtoFuture.join(), categoriasFuture.join(), avaliacoesFuture.join(), recomendacoesFuture.join());
+}
+
+A thread do Tomcat que recebeu a requisição HTTP chama `.join()` (ou `.get()`), e **fica bloqueada esperando** os 4 CompletableFutures completarem — mesmo que a execução real de cada um esteja rodando em pools separados (bulkheads).
+
+Isso quer dizer: você isolou o **esgotamento dos pools de dependências externas**, mas a thread do Tomcat ainda pode ficar presa até o timeout, se recomendações demorar muito e você não configurar um timeout curto nela.
+```
+
+### As 4 chamadas disparam, mas quem executa é outra thread
+
+```java
+CompletableFuture<Produto> produtoFuture = buscarProduto(id);
+```
+
+Quando essa linha executa, o que acontece é:
+
+1. A thread do Tomcat chama o método buscarProduto(id)
+2. Esse método (decorado com @ThreadPoolBulkhead) submete a execução real pro pool dedicado "produtos"
+3. A thread do Tomcat não espera — ela recebe de volta um CompletableFuture (uma "promessa" de resultado) e já segue pra próxima linha
+
+Ou seja, nesse ponto, a thread do Tomcat já disparou as 4 chamadas e nenhuma delas bloqueou nada ainda. As 4 execuções reais estão rodando em paralelo, cada uma na sua thread do respectivo pool bulkhead.
+
+```md
+Thread Tomcat: dispara os 4 → segue em frente
+                    │
+      ┌─────────────┼─────────────┬─────────────┐
+      ▼             ▼             ▼             ▼
+ Pool produtos  Pool categ.  Pool avaliaç.  Pool recomend.
+  (thread A)    (thread B)    (thread C)     (thread D)
+```
+
+Até aqui, tudo bem — é exatamente o isolamento que a gente descreveu.
+
+### O problema está na linha seguinte
+
+```java
+CompletableFuture.allOf(produtoFuture, categoriasFuture, avaliacoesFuture, recomendacoesFuture).join();
+```
+
+O método .join() significa literalmente: "pare aqui e não continue até que todos os 4 futures tenham terminado".
+
+Quem chama .join()? A thread do Tomcat — porque é ela quem está executando o método buscarCompleto. Então, mesmo as 4 chamadas rodando em paralelo em pools separados, a thread do Tomcat que orquestra tudo isso fica parada, sem fazer nada, só esperando o mais lento dos 4 terminar.
+
+```md
+Thread Tomcat: dispara os 4 → chega no .join() → FICA PARADA AQUI
+                    │                                    ▲
+      ┌─────────────┼─────────────┬─────────────┐        │
+      ▼             ▼             ▼             ▼        │
+ produtos(50ms) categ.(80ms) avaliaç.(100ms) recomend.(10s)
+      │             │             │             │
+      └─────────────┴─────────────┴─────────────┘
+                     todos terminam → thread Tomcat libera
+```
+
+Se recomendacoes demora 10s, a thread do Tomcat fica esses 10s inteiros travada no .join(), mesmo que ela mesma não esteja fazendo a chamada de rede — ela só está esperando alguém (a thread D, do pool recomendações) terminar.
+
+### Por que isso é um problema, se o pool de recomendações está isolado?
+
+Aqui está o ponto central que eu quis passar: você isolou o pool que executa a chamada, mas não isolou quem está esperando o resultado.
+
+- ✅ O pool "recomendações" não contamina os pools de produtos/categorias/avaliações — isso está protegido.
+
+- ❌ Mas a thread do Tomcat (que é um recurso limitado — normalmente 200 no seu exemplo) fica presa esperando, e isso não tem nada a ver com o Bulkhead. O Bulkhead nunca prometeu resolver esse problema — ele só isola a execução, não o consumidor que está esperando o resultado.
+
+Se 50 requisições simultâneas passarem por esse mesmo fluxo, e todas dependerem de recomendacoes (que está lenta), você pode ter 50 threads do Tomcat travadas no .join() — voltando ao problema original de esgotamento de threads, só que agora a causa é diferente (é a espera bloqueante, não mais a execução em si).
+
+#### As duas soluções que citei
+
+1. Timeout curto — você limita quanto tempo a thread do Tomcat aceita esperar:
+  1.1
+
+    ```java
+    CompletableFuture.allOf(...).orTimeout(2, TimeUnit.SECONDS).join();
+    ```
+
+Assim, mesmo que recomendacoes demore 10s, sua thread do Tomcat só fica presa por 2s no máximo — depois disso, você trata como falha/fallback.
+
+1. Modelo reativo (WebFlux) — em vez de .join(), você usa Mono/Flux, e a thread do Tomcat (ou do Netty, no caso do WebFlux) nunca fica bloqueada esperando. Ela é devolvida ao pool assim que dispara a chamada, e só é "religada" quando o resultado chega, via callback — sem spin, sem espera ativa.
+
+### Quando esse código é aceitável
+
+Se o seu volume de requisições é baixo, ou se você já tem um timeout configurado em algum lugar (no WebClient, no próprio ThreadPoolBulkheadConfig, ou via TimeLimiter), esse padrão pode ser perfeitamente suficiente na prática. Muita gente usa isso em produção sem problema, porque o timeout do próprio HTTP client já limita o estrago.
+
+O ponto que eu quis frisar não é "nunca escreva assim", e sim: não assuma que só o Bulkhead resolve o esgotamento de threads do Tomcat. Se você depender só do Bulkhead sem timeout na espera, ainda existe uma via de esgotamento — mais lenta e mais isolada que o problema original, mas existe.
+
+#### Caso 1: CompletableFuture.allOf(...).join()
+
+Sim, bloqueia. O .join() é o vilão aqui, não o allOf. O allOf sozinho só combina os 4 futures em 1 só (ele não bloqueia nada). Mas assim que você chama .join() em cima disso, a thread atual (a do Tomcat) para e espera.
+
+```java
+CompletableFuture.allOf(produtoFuture, categoriasFuture, avaliacoesFuture, recomendacoesFuture).join();
+//                                                                                              ↑
+//                                                                              ISSO bloqueia a thread
+```
+
+#### Caso 2: CompletableFuture.allOf(...).thenApply(...)
+
+Não bloqueia. Aqui eu troquei o .join() por .thenApply(...). Não existe nenhuma chamada bloqueante nessa linha:
+
+```java
+return CompletableFuture.allOf(produtoFuture, categoriasFuture, avaliacoesFuture, recomendacoesFuture)
+    .thenApply(v -> montarDTO(...)); 
+//   ↑
+//   isso NÃO bloqueia — apenas registra "quando tudo terminar, execute essa função"
+```
+
+.thenApply() não pergunta "já terminou?" e não espera. Ele diz: "quando terminar, roda isso aqui" — e devolve na hora um novo CompletableFuture (ainda não resolvido) representando esse resultado futuro. A thread do Tomcat recebe esse CompletableFuture de volta imediatamente e é liberada para atender outra requisição.
+
+#### O .join() que sobrou dentro do thenApply
+
+Você deve estar confuso com isso aqui, que ainda tem .join() dentro:
+
+```java
+.thenApply(v -> montarDTO(
+    produtoFuture.join(),
+    categoriasFuture.join(),
+    ...
+));
+```
+
+Esse .join() aqui não bloqueia ninguém de verdade, porque ele só executa depois que o allOf já garantiu que todos os 4 futures terminaram. É só uma forma de "desembrulhar" o valor de dentro do future — tecnicamente ele "bloqueia", mas o bloqueio dura zero tempo, porque o valor já está pronto ali.
