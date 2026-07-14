@@ -231,3 +231,43 @@ Em ambos os casos, cada chamada tenta adquirir uma vaga (permit ou thread do poo
 
 Quando um serviço externo é lento ou instável, isolamos o acesso a ele em um bulkhead próprio, para que o esgotamento desse recurso específico não contamine as chamadas a outros serviços. Com ThreadPoolBulkhead, isso protege genuinamente as threads do pool principal da aplicação — mas se a chamada for feita de forma síncrona (.join()/.get()), a thread original ainda fica bloqueada esperando o resultado, a menos que se use timeout ou um modelo totalmente reativo/assíncrono.
 ```
+
+Exemplo bem didatico:
+
+Uma sala de reuniões do time de recomendações só comporta 20 pessoas.
+
+```md
+Empresa
+
+200 funcionários
+  Sala Recomendações
+    capacidade = 20
+
+Os funcionários continuam existindo.
+
+Quer entrar na sala?
+  Quer entrar na sala?
+    Sim → entra
+    Não → vai embora
+
+Não é a empresa que diminuiu.
+É a capacidade daquela sala.
+```
+
+## Por que normalmente recomendamos SemaphoreBulkhead no Spring MVC?
+
+Porque o Spring MVC já possui um pool de threads (o do Tomcat).
+
+Criar outro pool geralmente adiciona:
+
+- troca de contexto (context switch);
+- mais consumo de memória;
+- mais complexidade.
+
+Mas a thread do Tomcat continua esperando se você fizer .get() ou .join().
+Então, em muitos casos, você só adicionou mais um pool sem resolver o problema principal.
+
+Por isso é comum ver recomendações como:
+
+- Spring MVC síncrono → SemaphoreBulkhead
+- WebFlux / programação assíncrona → ThreadPoolBulkhead, quando faz sentido isolar um recurso.
