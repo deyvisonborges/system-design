@@ -312,3 +312,5 @@ Resumo: view materializada armazena o resultado de uma consulta como uma tabela 
 - [ ] Explicar a separação de comandos e consultas em CQRS
 - [ ] Reconstruir estado com event sourcing
 - [ ] Compreender materialized views para leituras rápidas
+
+ADAPTABILIDADE DE RELACOES HUMANAS

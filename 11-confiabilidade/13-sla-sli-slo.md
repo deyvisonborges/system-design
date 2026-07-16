@@ -39,6 +39,20 @@ Um SLA geralmente inclui:
 - SLO estabelece metas para esses indicadores.
 - SLA formaliza os objetivos em um acordo entre cliente e fornecedor.
 
+## Exemplo prático
+
+Imagine um serviço de streaming de vídeo.
+
+- SLI: percentual de requisições que retornam em menos de 500 ms.
+- SLO: 95% das requisições devem responder em menos de 500 ms durante um mês.
+- SLA: o fornecedor promete que, se a disponibilidade cair abaixo de 99,5% no mês, o cliente receberá um desconto no plano.
+
+Nesse caso:
+
+- o SLI mede o desempenho real do serviço;
+- o SLO define a meta interna da equipe;
+- o SLA formaliza o compromisso com o cliente.
+
 ## Boas práticas
 
 - Use SLIs acionáveis e relevantes para o usuário.

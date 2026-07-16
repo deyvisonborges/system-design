@@ -6,19 +6,19 @@
   - Jitter [OK]
   - Circuit Break [OK]
   - Timeout [OK]
-  - Bulkhead
+  - Bulkhead [OK]
 - Consistencia
-  - ACID
-  - BASE
-  - Saga Pattern
-  - Teorama CAP
-  - Change Data Capture
-  - Transactional Outbox Pattern
+  - ACID [OK]
+  - BASE [OK]
+  - Saga Pattern [OK]
+  - Teorama CAP [OK]
+  - Change Data Capture [OK]
+  - Transactional Outbox Pattern [OK]
 - Alta Disponibilidade
 - Performance
 - Escalabilidade
 - Confiabilidade
-  - SLA / SLI / SLO
+  - `SLA / SLI / SLO`
   - P90
 - Observabilidade e Monitoramento
   - Logging
@@ -32,6 +32,9 @@
   - Latency
 - Seguranca e Conformidade
 - Dados e persistencia
+  - `Connection Pool`
+  - `pgBouncer`
+  - `Hiraki`
 - Integracao e Comunicacao
   - Principios
     - Desacoplamento
@@ -58,11 +61,11 @@
         - SQS
         - SNS
 - API Gateway
-- Anti-Corruption Layer
+- Anti-Corruption Layer [OK]
 - REST, GraphQL, gRPC, JSON-RPC
-- CQRS
-- Idempotencia
-- Cache
+- CQRS [OK]
+- Idempotencia [OK]
+- Cache [OK]
 - Infra
   - Docker
   - Kubernetes
