@@ -1,9 +1,11 @@
 # Distributed Tracing
 
 ## 1. O que é
-Distributed tracing é a técnica de capturar e correlacionar spans em uma transação que atravessa múltiplos processos, serviços ou nós, para reconstruir o caminho end-to-end e medir latências distribuídas.
+
+O tracing distribuído (ou rastreamento distribuído) é um método para monitorar, registrar e acompanhar requisições de ponta a ponta à medida que elas passam por vários microsserviços, APIs e bancos de dados. Seus componentes principais são os traces (o caminho completo da requisição), os spans (cada etapa individual) e a
 
 Sinônimos / nomes alternativos:
+
 - Trace context
 - End-to-end tracing
 - Request tracing
@@ -11,6 +13,7 @@ Sinônimos / nomes alternativos:
 - Causal tracing
 
 Variações / camadas reconhecidas:
+
 - Trace propagation (W3C TraceContext, B3, Jaeger)
 - Sampling strategies (head-based, tail-based, adaptive)
 - Synchronous vs asynchronous spans
@@ -18,6 +21,7 @@ Variações / camadas reconhecidas:
 - OpenTelemetry tracing vs Jaeger/Zipkin native
 
 ## 2. Por que existe (o problema que resolve)
+
 Em arquiteturas monolíticas, a observação da execução era simples porque o fluxo permanecia em um processo. Com microserviços, cada requisição pode atravessar dezenas de serviços, tornando difícil entender onde a latência ou erro ocorreu.
 
 O problema se manifestou em empresas como Google, Netflix e Twitter. O paper "Dapper: A Large-Scale Distributed Systems Tracing Infrastructure" e as ferramentas Zipkin e Jaeger popularizaram a solução.
@@ -27,89 +31,119 @@ Antes do tracing distribuído, equipes dependiam de logs separados e correlaçã
 ## 3. Tipos e características
 
 ### 3.1 Head-based sampling
+
 Como funciona:
+
 - Avalia cada trace no início do pedido.
 - Decide se coleta ou descarta o trace inteiro.
 
 Prós:
+
 - Simples e eficiente.
 - Bom para reduzir custo inicial.
 
 Contras:
+
 - Pode perder eventos raros ou falhas posteriores.
 
 Camada:
+
 - Instrumentação de aplicação / biblioteca de tracing.
 
 Quando usar:
+
 - Quando o volume é alto e o custo precisa ser limitado.
 
 ### 3.2 Tail-based sampling
+
 Como funciona:
+
 - Coleta spans temporariamente e decide após ver o resultado do trace.
 - Prioriza traces que realmente falharam ou ultrapassaram latência.
 
 Prós:
+
 - Mais preciso para capturar problemas reais.
 - Evita descartar erros importantes.
 
 Contras:
+
 - Requer buffer e maior custo de armazenamento temporário.
 
 Camada:
+
 - Coletor / backend.
 
 Quando usar:
+
 - Em produção para encontrar falhas e saturação com menos ruído.
 
 ### 3.3 Synchronous tracing
+
 Como funciona:
+
 - Contexto de trace é propagado imediatamente em chamadas HTTP/GRPC.
 - Spans são abertos e fechados enquanto o fluxo está ativo.
 
 Prós:
+
 - Visibilidade completa da cadeia de chamada.
 
 Contras:
+
 - Pode aumentar latência de aplicações sensíveis.
 
 Camada:
+
 - Aplicação / transporte.
 
 Quando usar:
+
 - Em serviços que precisam de visibilidade detalhada de chamadas.
 
 ### 3.4 Asynchronous tracing
+
 Como funciona:
+
 - Spans em tarefas assíncronas são correlacionados por contextos explícitos.
 - Exemplo: filas, workers e callbacks.
 
 Prós:
+
 - Captura fluxos sem bloqueio direto.
 
 Contras:
+
 - Requer propagação manual ou bibliotecas avançadas.
 
 Camada:
+
 - Aplicação / middleware.
 
 Quando usar:
+
 - Para pipelines de eventos, jobs em background e mensageria.
 
 ### 3.5 Protocolos de propagação
+
 Como funciona:
+
 - W3C TraceContext, B3 e Jaeger definem headers e formatos.
 
 Prós:
+
 - Compatibilidade entre ferramentas.
 
 Contras:
+
 - Misturar protocolos exige tradução no coletor.
 
 Camada:
+
 - Transporte / rede.
 
 Quando usar:
+
 - W3C TraceContext para compatibilidade moderna.
 - B3 em ambientes Zipkin legados.
 
@@ -124,6 +158,7 @@ Quando usar:
 7. Consulta e visualização: UI exibe trace waterfall e latências por serviço.
 
 Componentes:
+
 - Instrumentação da aplicação
 - Propagador de contexto
 - SDK de tracing
@@ -132,6 +167,7 @@ Componentes:
 - Interface de análise
 
 Algoritmos/estratégias:
+
 - W3C TraceContext e B3 para propagação de headers.
 - Amostragem head-based / tail-based.
 - Mapeamento de spans e parent-child.
@@ -140,22 +176,26 @@ Algoritmos/estratégias:
 ## 5. Onde e como se aplica na prática
 
 ### Nível de máquina/processo único
+
 - Em uma aplicação Spring Boot, spans locais ajudam a medir tempo de execução de métodos.
 - Em Node/NestJS, tracer local pode instrumentar chamadas de banco e redis.
 - Útil para diagnosticar performance antes de distribuir o serviço.
 
 ### Nível on-premise/self-managed
+
 - Jaeger e Zipkin como coletores e backends.
 - OpenTelemetry Collector para unificar traces e exportar para múltiplos backends.
 - Elastic APM Server autogerencia traces no stack Elastic.
 
 ### Nível de nuvem/managed service
+
 - AWS X-Ray oferece traces distribuídos com segment documents.
 - GCP Cloud Trace captura latência de aplicações instrumentadas.
 - Azure Monitor Application Insights tem suporte a trace distributed.
 - Datadog APM e New Relic Distributed Tracing.
 
 ### Nível de orquestração/Kubernetes
+
 - Istio/Envoy injetam headers de trace automaticamente em tráfego mTLS.
 - OpenTelemetry Collector como DaemonSet/sidecar.
 - K8s Service Mesh permite visualizar dependências de serviço com tracing.
@@ -163,6 +203,7 @@ Algoritmos/estratégias:
 ## 6. Casos de uso reais e quando NÃO usar
 
 ### Casos de uso reais
+
 - Netflix: entender latência de chamadas entre serviços de recomendação, inventário e catálogo. Tipo: tracing síncrono com W3C/B3.
 - Uber: rastrear requisições de mobilidade que atravessam matching, pricing e dispatch. Tipo: tail-based sampling para capturar erros.
 - Shopify: diagnosticar falhas de checkout com spans de front-end a back-end. Tipo: trace propagation em HTTP e banco.
@@ -170,6 +211,7 @@ Algoritmos/estratégias:
 - Kubernetes service mesh: detectar problemas de latência entre pods com Istio.
 
 ### Quando NÃO usar ou evitar
+
 - Em aplicações monolíticas pequenas sem dependências distribuídas, a sobrecarga do tracing pode ser desnecessária.
 - Em sistemas de alta taxa sem amostragem, os dados podem crescer rapidamente e consumir recursos.
 - Se não houver mecanismo de propagação de contexto, o trace ficará fragmentado e perde utilidade.
@@ -178,12 +220,15 @@ Algoritmos/estratégias:
 ## 7. Cenários práticos e trade-offs
 
 ### Cenário 1: Pedido falho em várias services
+
 Uma requisição de checkout percorre `api-gateway -> auth -> cart -> payment -> inventory`. Com traces, é possível ver que `payment` foi mais lento e que a falha ocorreu ao chamar o gateway de pagamentos.
 
 ### Cenário 2: Picos de tráfego e amostragem
+
 Durante um pico, o sistema usa head-based sampling de 10% para reduzir ingestão. Depois, detecta erro elevado e muda para tail-based sampling para capturar traces de falha.
 
 ### Cenário 3: Falha de contexto em filas
+
 Uma mensagem enviada para Kafka perde o `trace_id` porque o produtor não o propaga no header. O trace fica truncado no backend e não há visão completa do fluxo assíncrono.
 
 ### Tabela de trade-offs
@@ -309,6 +354,7 @@ public class OrderController {
 ```
 
 Pontos-chave:
+
 - `OtlpGrpcSpanExporter` envia spans ao coletor OpenTelemetry.
 - O span root `checkout.order` é criado e atributos são adicionados.
 - Em produção, o collector agrupa spans de múltiplos serviços.
@@ -365,6 +411,7 @@ export class OrdersController {
 ```
 
 Pontos-chave:
+
 - A instrumentação automática captura chamadas HTTP e de banco.
 - O exporter OTLP envia spans ao collector.
 - O tracer manual cria spans de alto nível.
@@ -372,14 +419,17 @@ Pontos-chave:
 ## 11. Comparação e armadilhas comuns
 
 ### Comparação com logs
+
 - Logs registram eventos e estado, enquanto tracing mostra fluxo causal.
 - Tracing é o melhor para localizar onde a requisição ficou lenta.
 
 ### Comparação com métricas
+
 - Métricas dão sinais agregados de saúde.
 - Tracing dá detalhamento por transação.
 
 ### Erros comuns
+
 - Não propagar headers de trace (`traceparent`, `b3`) em chamadas HTTP. Consequência: trace fragmentado.
 - Amostragem muito baixa que descarta erros. Consequência: incapacidade de analisar falhas reais.
 - Criar spans excessivamente pequenos em loops. Consequência: ruído e custo de armazenamento.

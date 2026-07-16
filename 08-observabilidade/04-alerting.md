@@ -1,9 +1,11 @@
 # Alerting
 
 ## 1. O que é
+
 Alerting é o processo de detectar condições anômalas em sistemas observáveis e notificar pessoas ou serviços para ação imediata.
 
 Sinônimos / nomes alternativos:
+
 - Monitoring alerts
 - Incident alerting
 - Alert management
@@ -11,6 +13,7 @@ Sinônimos / nomes alternativos:
 - Anomaly detection alerting
 
 Variações / camadas reconhecidas:
+
 - Threshold-based alerting
 - Anomaly-based alerting
 - Composite alerting
@@ -19,6 +22,7 @@ Variações / camadas reconhecidas:
 - Log-based alerting
 
 ## 2. Por que existe (o problema que resolve)
+
 Alerting existe porque equipes não podem observar manualmente dashboards 24/7. Quando algo quebra, é preciso ser notificado rapidamente para reduzir tempo de recuperação.
 
 Historicamente, sistemas como Nagios e PagerDuty tornaram evidente que apenas coletar métricas não basta; é preciso executar regras e enviar notificações. Alerting também surgiu como prática central em SRE para manter SLOs e evitar que problemas pequenos se tornem incidentes críticos.
@@ -26,91 +30,121 @@ Historicamente, sistemas como Nagios e PagerDuty tornaram evidente que apenas co
 ## 3. Tipos e características
 
 ### 3.1 Threshold-based alerting
+
 Como funciona:
+
 - Avalia um valor de métrica contra um limite fixo ou dinâmico.
 - Exemplo: `CPU > 85% por 5 minutos`.
 
 Prós:
+
 - Simples de configurar.
 - Fácil de entender.
 
 Contras:
+
 - Pode gerar muitos falsos positivos em variações normais.
 
 Camada:
+
 - Monitoramento / aplicação de regras.
 
 Quando usar:
+
 - Em métricas de recursos estáveis, como uso de memória ou latência de endpoint.
 
 ### 3.2 Anomaly-based alerting
+
 Como funciona:
+
 - Usa algoritmos estatísticos ou ML para detectar desvios esperados.
 - Exemplo: aumento inesperado de erro 500 em relação ao histórico.
 
 Prós:
+
 - Menos dependente de limites fixos.
 - Detecta padrões novos.
 
 Contras:
+
 - Requer mais dados e ajuste.
 
 Camada:
+
 - Plataforma de monitoramento / análise.
 
 Quando usar:
+
 - Em ambientes dinâmicos onde padrões de carga variam.
 
 ### 3.3 Composite alerting
+
 Como funciona:
+
 - Combina múltiplas condições.
 - Exemplo: `erro 500 > 5% E latência > 1s`.
 
 Prós:
+
 - Reduz ruído.
 - Foca em problemas específicos.
 
 Contras:
+
 - Mais complexo de configurar e depurar.
 
 Camada:
+
 - Regras de alerta.
 
 Quando usar:
+
 - Para detectar condições reais que envolvem múltiplos sinais.
 
 ### 3.4 Heartbeat / availability alerting
+
 Como funciona:
+
 - Verifica se um serviço envia um sinal regular.
 - Exemplo: uma job cron que reporta sua execução a cada 60s.
 
 Prós:
+
 - Detecta falhas silenciosas.
 
 Contras:
+
 - Não informa automaticamente a causa.
 
 Camada:
+
 - Infraestrutura / disponibilidade.
 
 Quando usar:
+
 - Em pipelines, jobs agendados e serviços sem tráfego constante.
 
 ### 3.5 Log-based alerting
+
 Como funciona:
+
 - Analisa logs em tempo real para padrões de erro ou anomalia.
 - Exemplo: `count(error) > 10 em 1 min`.
 
 Prós:
+
 - Útil quando métricas não cobrem todos os casos.
 
 Contras:
+
 - Depende de logs de boa qualidade e ingestão em tempo real.
 
 Camada:
+
 - Logs / observabilidade.
 
 Quando usar:
+
 - Para alertas sobre exceções específicas ou auditoria.
 
 ## 4. Como funciona (mecanismo interno)
@@ -124,6 +158,7 @@ Quando usar:
 7. Escalação: regras de roteamento e urgência são aplicadas.
 
 Componentes:
+
 - Fonte de sinais (métricas, logs, traces)
 - Engine de regras
 - Motor de avaliação temporal
@@ -131,6 +166,7 @@ Componentes:
 - Roteador e gerenciador de silenciamento
 
 Estratégias / algoritmos:
+
 - Janela de tempo com agregações (avg, sum, max)
 - Detecção de anomalias baseada em histórico
 - Avaliação de múltiplas condições (AND/OR)
@@ -139,21 +175,25 @@ Estratégias / algoritmos:
 ## 5. Onde e como se aplica na prática
 
 ### Nível de máquina/processo único
+
 - Um serviço local expõe métricas e uma ferramenta pode alertar se o tempo de resposta ultrapassar um limite.
 - Soluções simples: scripts de shell que verificam logs e enviam notificações.
 
 ### Nível on-premise/self-managed
+
 - Prometheus Alertmanager para alertas baseados em métricas.
 - Grafana Alerting para regras combinadas em dashboards.
 - Zabbix, Nagios e Sensu para monitoramento de host e serviço.
 
 ### Nível de nuvem/managed service
+
 - AWS CloudWatch Alarms para métricas de EC2, RDS e custom metrics.
 - GCP Cloud Monitoring Alerts para Cloud Run, GKE e VMs.
 - Azure Monitor Alerts para Application Insights e recursos Azure.
 - Datadog Monitors, New Relic Alerts e PagerDuty.
 
 ### Nível de orquestração/Kubernetes
+
 - PrometheusRule e Alertmanager em clusters Kubernetes.
 - Grafana Loki + Grafana alerts para logs de pods.
 - Kube-state-metrics e Node Exporter para alertas de saúde do cluster.
@@ -162,6 +202,7 @@ Estratégias / algoritmos:
 ## 6. Casos de uso reais e quando NÃO usar
 
 ### Casos de uso reais
+
 - E-commerce: alerta de aumento de erro 500 durante Black Friday. Tipo: threshold-based.
 - Plataforma SaaS: alerta de burn rate do SLO de latência. Tipo: composite alerting.
 - Job ETL: alerta de falta de heartbeat em pipeline de dados. Tipo: heartbeat alert.
@@ -169,6 +210,7 @@ Estratégias / algoritmos:
 - API pública: alerta de aumento súbito de latência com anomalias. Tipo: anomaly-based.
 
 ### Quando NÃO usar ou evitar
+
 - Não use alertas sem runbook: um alerta sem ação causa alerta fatigue.
 - Evite regras muito sensíveis em métricas volumosas: levam a ruído.
 - Não dependa somente de um único tipo de alerta; combine métricas e logs.
@@ -177,12 +219,15 @@ Estratégias / algoritmos:
 ## 7. Cenários práticos e trade-offs
 
 ### Cenário 1: Alerta de CPU em servidor crítico
+
 Uma regra threshold dispara quando CPU > 80% por 3 minutos. O time recebe notificação e identifica processo abusivo antes que o serviço degrade.
 
 ### Cenário 2: Falha silenciosa de job
+
 Um pipeline de ingestão não envia heartbeat. Heartbeat alert detecta a falha antes que dados sejam perdidos.
 
 ### Cenário 3: Detecção de anomalia em erros HTTP
+
 Uma aplicação começa a retornar 502 de forma intermitente. Anomaly-based alerting identifica o aumento do erro sem precisar ajustar thresholds fixos.
 
 ### Tabela de trade-offs
@@ -285,6 +330,7 @@ groups:
           summary: "Alta taxa de erros em Order Service"
           description: "Mais de 10 erros nos últimos 5 minutos."
 ```
+
 ```
 
 Pontos-chave:
@@ -346,6 +392,7 @@ export class AlertingController {
 ```
 
 Pontos-chave:
+
 - O NestJS expõe métricas para Prometheus coletar.
 - O alerta é definido no backend de monitoramento, não na aplicação.
 - A métrica `orders_errors_total` é base para um alerta threshold.
@@ -353,14 +400,17 @@ Pontos-chave:
 ## 11. Comparação e armadilhas comuns
 
 ### Comparação com dashboards
+
 - Dashboards mostram estado atual e histórico.
 - Alerting notifica quando uma condição requer ação imediata.
 
 ### Comparação com incident response
+
 - Alerting é o gatilho inicial.
 - Incident response é o processo que acontece após o alerta.
 
 ### Erros comuns
+
 - Alertas sem runbook: equipes não sabem como responder.
 - Regra muito sensível: causa alert fatigue.
 - Notificação redundante em múltiplos canais: gera ruído.
