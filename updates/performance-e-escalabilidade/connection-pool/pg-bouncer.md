@@ -188,3 +188,63 @@ Regra prática: nunca aumente um número de pool baseado só em "sinto que tá l
 - <https://www-scaleway-com.translate.goog/en/docs/tutorials/install-pgbouncer/?_x_tr_sl=en&_x_tr_tl=pt&_x_tr_hl=pt&_x_tr_pto=tc&_x_tr_hist=true>
 
 - <https://kubedb-com.translate.goog/articles/deploy-pgbouncer-using-kubernetes-pgbouncer-operator/?_x_tr_sl=en&_x_tr_tl=pt&_x_tr_hl=pt&_x_tr_pto=tc>
+
+___
+___
+
+Cenário 1 - Apenas HikariCP
+
+Imagine:
+
+20 microserviços
+Cada um com maximumPoolSize = 20
+
+Você terá, no pior caso:
+
+20 serviços
+× 20 conexões
+---------------
+
+400 conexões abertas no PostgreSQL
+
+Onde começa o problema?
+
+O problema aparece quando você escala horizontalmente.
+
+Imagine agora:
+
+20 microserviços
+
+Cada serviço possui:
+
+10 pods
+
+Cada pod possui:
+
+Hikari = 20
+
+Agora temos
+
+20 serviços
+× 10 pods
+× 20 conexões
+
+= 4.000 conexões
+
+Aí o PostgreSQL começa a sofrer.
+
+Não porque existem 4.000 queries.
+
+Mas porque existem 4.000 conexões abertas.
+
+Cada conexão possui:
+
+memória
+processo/backend
+buffers
+locks
+gerenciamento interno
+
+No PostgreSQL uma conexão não é barata.
+
+> O gatilho não é o número de requisições por segundo (RPS). O verdadeiro gatilho é quando a soma de todas as conexões dos pools Hikari (de todos os pods e microserviços) passa a representar um custo significativo para o PostgreSQL. Nesse momento, o PgBouncer permite que milhares de clientes lógicos compartilhem um número muito menor de conexões físicas com o banco, reduzindo drasticamente esse custo.
