@@ -106,6 +106,112 @@ SELECT * FROM accounts WHERE id = 123 LOCK IN SHARE MODE;
 SELECT * FROM accounts WITH (XLOCK) WHERE id = 123;
 ```
 
+### 4.3 Locks de Linha no PostgreSQL: FOR UPDATE vs FOR SHARE vs FOR NO KEY UPDATE vs FOR KEY SHARE
+
+O PostgreSQL oferece quatro modos de lock de linha com diferentes níveis de restrição e impacto na concorrência:
+
+#### FOR UPDATE (Mais Restritivo)
+
+- **O que faz**: Adquire um lock exclusivo forte nas linhas selecionadas
+- **Bloqueia**: SELECT FOR UPDATE, SELECT FOR NO KEY UPDATE, SELECT FOR SHARE, SELECT FOR KEY SHARE, UPDATE, DELETE
+- **Não bloqueia**: SELECT simples (sem FOR clause)
+- **Quando usar**: Quando você precisa modificar as linhas posteriormente na mesma transação e quer garantir que ninguém mais as modifique
+- **Quando NÃO usar**: Quando você só precisa ler dados para referência, sem intenção de modificar
+
+```sql
+-- Cenário: Reserva de saldo para pagamento
+BEGIN;
+SELECT balance FROM accounts WHERE id = 123 FOR UPDATE;
+-- Ninguém mais pode modificar esta conta até você commitar
+UPDATE accounts SET balance = balance - 100 WHERE id = 123;
+COMMIT;
+```
+
+#### FOR NO KEY UPDATE
+
+- **O que faz**: Adquire um lock exclusivo, mas mais fraco que FOR UPDATE
+- **Bloqueia**: SELECT FOR UPDATE, SELECT FOR NO KEY UPDATE
+- **Não bloqueia**: SELECT FOR SHARE, SELECT FOR KEY SHARE, SELECT simples
+- **Diferença chave**: Não bloqueia operações que modificam apenas colunas não-chave (não-unique, não-PK)
+- **Quando usar**: Quando você vai modificar colunas não-chave e não se importa se outros modificam colunas chave
+- **Quando NÃO usar**: Quando você vai modificar colunas que são chaves primárias, chaves únicas ou colunas indexadas que afetam unicidade
+
+```sql
+-- Cenário: Atualizar metadata não-crítica (ex: last_accessed_at)
+BEGIN;
+SELECT * FROM users WHERE id = 123 FOR NO KEY UPDATE;
+-- Outros podem modificar colunas chave (ex: email) concorrentemente
+UPDATE users SET last_accessed_at = NOW() WHERE id = 123;
+COMMIT;
+```
+
+#### FOR SHARE
+
+- **O que faz**: Adquire um lock compartilhado nas linhas selecionadas
+- **Bloqueia**: SELECT FOR UPDATE, SELECT FOR NO KEY UPDATE, UPDATE, DELETE
+- **Não bloqueia**: SELECT FOR SHARE, SELECT FOR KEY SHARE, SELECT simples
+- **Quando usar**: Quando você precisa garantir que as linhas não sejam modificadas enquanto você as lê, mas não vai modificá-las
+- **Quando NÃO usar**: Quando você vai modificar as linhas (use FOR UPDATE ou FOR NO KEY UPDATE)
+
+```sql
+-- Cenário: Verificar consistência de múltiplas tabelas antes de operação
+BEGIN;
+SELECT balance FROM accounts WHERE id = 123 FOR SHARE;
+SELECT limit FROM credit_limits WHERE user_id = 123 FOR SHARE;
+-- Garante que ninguém modifica enquanto você valida regras
+IF balance >= amount THEN
+    -- Prossegue com operação
+END IF;
+COMMIT;
+```
+
+#### FOR KEY SHARE (Menos Restritivo)
+
+- **O que faz**: Adquire um lock compartilhado muito fraco
+- **Bloqueia**: SELECT FOR UPDATE, SELECT FOR NO KEY UPDATE
+- **Não bloqueia**: SELECT FOR SHARE, SELECT FOR KEY SHARE, SELECT simples, UPDATE/DELETE de colunas não-chave
+- **Diferença chave**: Permite que outros modifiquem colunas não-chave concorrentemente
+- **Quando usar**: Quando você precisa proteger apenas contra modificações em colunas chave (PK, unique constraints)
+- **Quando NÃO usar**: Quando você precisa proteger contra qualquer modificação (use FOR SHARE)
+
+```sql
+-- Cenário: Verificar FK ou PK sem bloquear updates em outras colunas
+BEGIN;
+SELECT * FROM orders WHERE id = 123 FOR KEY SHARE;
+-- Outros podem modificar colunas não-chave (ex: status, notes)
+-- Mas não podem modificar o id (PK) ou colunas unique
+-- Útil para validar relacionamentos sem bloquear updates não-críticos
+COMMIT;
+```
+
+#### Matriz de Compatibilidade
+
+| Lock Mode           | FOR UPDATE | FOR NO KEY UPDATE | FOR SHARE | FOR KEY SHARE |
+|:--------------------|:-----------|:------------------|:----------|:--------------|
+| FOR UPDATE          | ❌          | ❌                 | ❌         | ❌             |
+| FOR NO KEY UPDATE   | ❌          | ❌                 | ✅         | ✅             |
+| FOR SHARE           | ❌          | ✅                 | ✅         | ✅             |
+| FOR KEY SHARE       | ❌          | ✅                 | ✅         | ✅             |
+
+#### Guia de Decisão Rápido
+
+- **Vou modificar a linha e não quero que ninguém mais modifique nada** → `FOR UPDATE`
+- **Vou modificar apenas colunas não-chave** → `FOR NO KEY UPDATE`
+- **Não vou modificar, mas quero garantir que ninguém modifique** → `FOR SHARE`
+- **Não vou modificar, só preciso proteger contra mudanças em chaves** → `FOR KEY SHARE`
+- **Só vou ler, não me importa consistência estrita** → SELECT simples (sem FOR clause)
+
+#### Impacto na Concorrência
+
+Quanto mais restritivo o lock, maior o impacto na concorrência:
+
+1. **FOR KEY SHARE** → Menor impacto (permite mais concorrência)
+2. **FOR SHARE** → Impacto médio
+3. **FOR NO KEY UPDATE** → Impacto médio-alto
+4. **FOR UPDATE** → Maior impacto (bloqueia mais operações)
+
+Em sistemas de alta concorrência (ex: fintech, e-commerce), prefira sempre o lock menos restritivo que atende sua necessidade. Por exemplo, se você só precisa atualizar um timestamp de last_accessed_at, use `FOR NO KEY UPDATE` em vez de `FOR UPDATE` para permitir que outros atualizem colunas chave concorrentemente.
+
 ## 5. Deadlocks
 
 ### 5.1 O que é um Deadlock
