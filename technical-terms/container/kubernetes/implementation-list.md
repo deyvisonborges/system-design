@@ -1,0 +1,29 @@
+# Topicos para implementacao
+
+- Deploy
+- Service
+- Ingress
+- ConfigMap
+- Secret
+- StatefulSet
+- DaemonSet
+- Jobs
+- CronJobs
+- HPA
+- VPA
+- Node Affinity
+- Taints
+- Tolerations
+- Requests
+- Limits
+- Readiness
+- Liveness
+- Startup Probe
+- Rolling Update
+- Canary
+- Autoscaling
+- Helm
+- ArgoCD
+- Kustomize
+- Istio
+- KEDA

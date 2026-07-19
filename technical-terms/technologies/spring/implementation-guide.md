@@ -1,0 +1,21 @@
+- Spring Boot Auto Configuration
+- Spring Context
+- Bean Lifecycle
+- BeanFactory
+- ApplicationContext
+- AOP
+- Transactions
+- Proxy JDK
+- CGLIB
+- Spring MVC Internals
+- DispatcherServlet
+- Filter
+- Interceptor
+- Argument Resolver
+- HttpMessageConverter
+- Spring Security
+- Spring Data
+- WebFlux
+- Actuator
+- Micrometer
+- Virtual Threads (Java + Spring)
